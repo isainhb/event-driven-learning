@@ -1,0 +1,67 @@
+version: '3.8'
+services:
+  # 1. Zookeeper: Requerido por Kafka para coordinar el cluster
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    hostname: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  # 2. Kafka Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      # Conexión a Zookeeper
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      # Puertos de acceso desde el exterior (Tu PC)
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+
+      # Puertos internos del Docker Network
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://0.0.0.0:9092
+
+      # Topic a crear automáticamente
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+      # Importante para que los servicios Python/PHP puedan resolver 'kafka:29092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+  # 3. Microservicio Productor (PHP/Laravel)
+  producer:
+    build:
+      context: ./producer-php-api # Busca el Dockerfile en esta carpeta
+      dockerfile: Dockerfile
+    container_name: producer-php-api
+    ports:
+      - "8000:80" # Acceso externo: localhost:8000
+    volumes:
+      - ./producer-php-api:/var/www/html # Montar el código para desarrollo
+    depends_on:
+      - kafka # Asegura que Kafka inicie primero
+
+  # 4. Microservicio Consumidor (Python Worker)
+  consumer:
+    build:
+      context: ./consumer-python-worker # Busca el Dockerfile en esta carpeta
+      dockerfile: Dockerfile
+    container_name: consumer-python-worker
+    # No necesita ports si solo es un worker interno
+    volumes:
+      - ./consumer-python-worker:/app # Montar el código para desarrollo
+    depends_on:
+      - kafka # Asegura que Kafka inicie primero
+    # Es crucial que este contenedor se ejecute de forma continua
+    command: python main.py # O el comando para iniciar tu script/worker

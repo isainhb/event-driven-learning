@@ -1,0 +1,20 @@
+# Dependencies
+vendor
+
+# Laravel
+bootstrap/cache
+storage
+
+# Python
+__pycache__
+
+
+# Environment
+.env
+
+# IDE
+.idea
+.vscode
+
+# Temporary
+.temp_app
