@@ -20,6 +20,11 @@ services:
       - "9092:9092"
     depends_on:
       - zookeeper
+    healthcheck:
+      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     environment:
       # Connection to Zookeeper
       KAFKA_BROKER_ID: 1
@@ -50,7 +55,8 @@ services:
     volumes:
       - ./producer-php-api:/var/www/html # Mount the code for development
     depends_on:
-      - kafka # Ensure that Kafka starts first
+      kafka:
+        condition: service_healthy
 
   # 4. Consumer Service (Python Worker)
   consumer:
@@ -62,7 +68,10 @@ services:
     volumes:
       - ./consumer-python-worker:/app # Mount the code for development
     depends_on:
-      - kafka # Ensure that Kafka starts first
+      kafka:
+        condition: service_healthy
+      producer:
+        condition: service_started
     environment:
       PYTHONUNBUFFERED: 1
     # Ensure this container runs continuously
@@ -83,5 +92,7 @@ services:
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
       KAFKA_CLUSTERS_0_READONLY: 'true'
     depends_on:
-      - kafka
-      - zookeeper
+      kafka:
+        condition: service_healthy
+      zookeeper:
+        condition: service_started
