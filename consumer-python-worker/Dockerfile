@@ -1,11 +1,13 @@
-FROM python:3.13-alpine
+FROM python:3.13.9-slim
 
 WORKDIR /app
 
-COPY requirements.txt /app/requirements.txt
+COPY requirements.txt .
+
 RUN pip install --no-cache-dir -r requirements.txt
 
-# TODO: Use context from docker-compose.yml
+# Use context from docker-compose.yml
 COPY . .
 
-# TODO: Execution command will be defined in root's docker-compose.yml
+ENTRYPOINT []
+# Execution command will be defined in root's docker-compose.yml

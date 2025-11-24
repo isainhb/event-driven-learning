@@ -1,6 +1,6 @@
 version: '3.8'
 services:
-  # 1. Zookeeper: Requerido por Kafka para coordinar el cluster
+  # 1. Zookeeper: Required by Kafka to coordinate the cluster
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
@@ -21,47 +21,67 @@ services:
     depends_on:
       - zookeeper
     environment:
-      # Conexión a Zookeeper
+      # Connection to Zookeeper
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
 
-      # Puertos de acceso desde el exterior (Tu PC)
+      # Ports to access from the outside (Your PC)
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
 
-      # Puertos internos del Docker Network
+      # Internal ports of the Docker Network
       KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://0.0.0.0:9092
 
-      # Topic a crear automáticamente
+      # Topic to create automatically
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
 
-      # Importante para que los servicios Python/PHP puedan resolver 'kafka:29092'
+      # Important for Python/PHP services to resolve 'kafka:29092'
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 
-  # 3. Microservicio Productor (PHP/Laravel)
+  # 3. Producer Service (PHP/Laravel)
   producer:
     build:
-      context: ./producer-php-api # Busca el Dockerfile en esta carpeta
+      context: ./producer-php-api # Search for Dockerfile in this folder
       dockerfile: Dockerfile
     container_name: producer-php-api
     ports:
-      - "8000:80" # Acceso externo: localhost:8000
+      - "8000:80" # Access from outside: localhost:8000
     volumes:
-      - ./producer-php-api:/var/www/html # Montar el código para desarrollo
+      - ./producer-php-api:/var/www/html # Mount the code for development
     depends_on:
-      - kafka # Asegura que Kafka inicie primero
+      - kafka # Ensure that Kafka starts first
 
-  # 4. Microservicio Consumidor (Python Worker)
+  # 4. Consumer Service (Python Worker)
   consumer:
     build:
-      context: ./consumer-python-worker # Busca el Dockerfile en esta carpeta
+      context: ./consumer-python-worker # Search for Dockerfile in this folder
       dockerfile: Dockerfile
     container_name: consumer-python-worker
-    # No necesita ports si solo es un worker interno
+    # No needs ports if it's an internal worker
     volumes:
-      - ./consumer-python-worker:/app # Montar el código para desarrollo
+      - ./consumer-python-worker:/app # Mount the code for development
     depends_on:
-      - kafka # Asegura que Kafka inicie primero
-    # Es crucial que este contenedor se ejecute de forma continua
-    command: python main.py # O el comando para iniciar tu script/worker
+      - kafka # Ensure that Kafka starts first
+    environment:
+      PYTHONUNBUFFERED: 1
+    # Ensure this container runs continuously
+    command: python main.py # Or the command to start your script/worker
+
+  # 5. Kafka UI Interface
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    restart: always
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-kafka-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      # Schema Registry URL
+      # KAFKA_CLUSTERS_0_SCHEMAREGISTRY: 'http://schema-registry:8081'
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      KAFKA_CLUSTERS_0_READONLY: 'true'
+    depends_on:
+      - kafka
+      - zookeeper
