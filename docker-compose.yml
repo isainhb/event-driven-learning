@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   # 1. Zookeeper: Required by Kafka to coordinate the cluster
   zookeeper:
@@ -63,7 +62,7 @@ services:
     build:
       context: ./consumer-python-worker # Search for Dockerfile in this folder
       dockerfile: Dockerfile
-    container_name: consumer-python-worker
+    container_name: consumer-python-worker # Comment this line if you need to run multiple consumers
     # No needs ports if it's an internal worker
     volumes:
       - ./consumer-python-worker:/app # Mount the code for development

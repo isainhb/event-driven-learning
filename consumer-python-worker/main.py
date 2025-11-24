@@ -21,6 +21,12 @@ def process_message(msg):
         order_id = event_data['data']['order_id']
         event_type = event_data['event_type']
 
+        # -- Intentional failure simulation
+        # if order_id == 1003:
+        #     print(f"🚨 Fatal error: Failed to process Order ID {order_id} (divided by zero).")
+        #     raise ValueError("Irrecoverable error simulated.")
+        # -- End of intentional failure simulation
+
         print(f"[{event_type}] Received event for Order ID: {order_id}")
 
         # Async logic simulation 
@@ -29,8 +35,12 @@ def process_message(msg):
         print(f"  > ✅ Order ID {order_id} processed successfully")
 
     except Exception as e:
-        print(f"Error processing message: {str(e)}")
+        print(f"❌ Error processing message: {e}. Message was not processed successfully.")
         print(f"Raw message: {msg.value()}")
+        # IMPORTANT: Avoid consumer.commit(). The offset cannot be advanced.
+        return False
+    
+    return True
 
 
 def consume_events():
@@ -42,6 +52,7 @@ def consume_events():
         'bootstrap.servers': KAFKA_BROKER,
         'group.id': GROUP_ID,
         'auto.offset.reset': 'earliest', # Start from the beginning of the topic
+        'enable.auto.commit': False, # Do not commit automatically
     }
 
     # Create the consumer
@@ -73,11 +84,16 @@ def consume_events():
                     raise KafkaException(msg.error())
             else:
                 # Message received successfully
-                process_message(msg)
+                success = process_message(msg)
 
-                # Commit: Confirm that offset has been processed
-                # This is important to avoid reprocessing messages
-                consumer.commit(message=msg, asynchronous=True)
+                if success:
+                    # Commit: Confirm that offset has been processed
+                    # This is important to avoid reprocessing messages
+                    consumer.commit(message=msg, asynchronous=True)
+                else:
+                    # Do not commit. The offset cannot be advanced.
+                    print(f"🛑 Irrecoverable error. Finished worker to simulate a failure.")
+                    break
             
     except KeyboardInterrupt:
         print("Stopping consumer...")
